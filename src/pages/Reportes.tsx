@@ -1,190 +1,122 @@
-import { useState } from 'react'
-import { BarChart3, TrendingUp, Calendar, DollarSign, Package, ArrowLeft } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-
-// Datos de ejemplo - en producción vendrían de Supabase
-const ventasPorDia = [
-  { dia: 'Lun', ventas: 2450 },
-  { dia: 'Mar', ventas: 3200 },
-  { dia: 'Mie', ventas: 2800 },
-  { dia: 'Jue', ventas: 4100 },
-  { dia: 'Vie', ventas: 3800 },
-  { dia: 'Sab', ventas: 5200 },
-  { dia: 'Dom', ventas: 4600 },
-]
-
-const ventasPorCategoria = [
-  { name: 'Bebidas', value: 35, color: '#3b82f6' },
-  { name: 'Alimentos', value: 25, color: '#22c55e' },
-  { name: 'Dulces', value: 15, color: '#f59e0b' },
-  { name: 'Cerveza', value: 15, color: '#8b5cf6' },
-  { name: 'Otros', value: 10, color: '#6b7280' },
-]
-
-const productosTop = [
-  { nombre: 'Coca Cola 600ml', cantidad: 45, total: 585 },
-  { nombre: 'Cerveza Corona', cantidad: 38, total: 760 },
-  { nombre: 'Sabritas Adobadas', cantidad: 32, total: 416 },
-  { nombre: 'Galletas María', cantidad: 28, total: 280 },
-  { nombre: 'Red Bull', cantidad: 25, total: 625 },
-]
+import { useState, useEffect } from 'react'
+import { BarChart3, TrendingUp, DollarSign, Package, Calendar, Wallet, CreditCard, Users, PiggyBank } from 'lucide-react'
+import { useVentas } from '../hooks/useSupabase'
+import { supabase } from '../lib/supabase'
 
 export default function Reportes() {
-  const [periodo, setPeriodo] = useState<'hoy' | 'semana' | 'mes'>('hoy')
+  const { cargarVentas } = useVentas()
+  const [fecha, setFecha] = useState('')
+  const [ventasDia, setVentasDia] = useState<any[]>([])
+  const [creditosDia, setCreditosDia] = useState<any[]>([])
+  const [productos, setProductos] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const stats = {
-    ventasHoy: 4250.00,
-    ventasSemana: 28450.00,
-    ventasMes: 125680.00,
-    ticketPromedio: 85.50,
-    productosVendidos: 48,
-    clientesHoy: 32
+  useEffect(() => {
+    const hoy = new Date().toISOString().split('T')[0]
+    setFecha(hoy)
+    cargarDatos(hoy)
+  }, [])
+
+  const cargarDatos = async (f: string) => {
+    setLoading(true)
+    try {
+      // Ventas del dia
+      const { data: v } = await supabase
+        .from('ventas')
+        .select('*, venta_items(*, productos(precio_compra, precio_venta))')
+        .gte('created_at', f + 'T00:00:00')
+        .lte('created_at', f + 'T23:59:59')
+        .order('created_at', { ascending: false })
+      setVentasDia(v || [])
+
+      // Creditos del dia
+      const { data: c } = await supabase
+        .from('creditos')
+        .select('*, clientes(nombre)')
+        .gte('created_at', f + 'T00:00:00')
+        .lte('created_at', f + 'T23:59:59')
+      setCreditosDia(c || [])
+
+      // Productos para calcular ganancia
+      const { data: p } = await supabase.from('productos').select('*').eq('activo', true)
+      setProductos(p || [])
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
   }
 
+  const handleFiltrar = () => { if (fecha) cargarDatos(fecha) }
+
+  // CALCULOS CORTE DE CAJA
+  const totalEfectivo = ventasDia.filter((v: any) => v.metodo_pago === 'efectivo').reduce((sum, v) => sum + v.total, 0)
+  const totalTarjeta = ventasDia.filter((v: any) => v.metodo_pago === 'tarjeta').reduce((sum, v) => sum + v.total, 0)
+  const totalTransferencia = ventasDia.filter((v: any) => v.metodo_pago === 'transferencia').reduce((sum, v) => sum + v.total, 0)
+  const totalCredito = creditosDia.reduce((sum, c) => sum + c.total, 0)
+  const totalVentas = ventasDia.reduce((sum, v) => sum + v.total, 0)
+
+  // GANANCIA REAL (venta - costo)
+  let ganancia = 0
+  ventasDia.forEach((v: any) => {
+    v.venta_items?.forEach((item: any) => {
+      const costo = item.productos?.precio_compra || 0
+      const venta = item.precio_unitario || 0
+      ganancia += (venta - costo) * item.cantidad
+    })
+  })
+
+  const numVentas = ventasDia.length
+  const ticketPromedio = numVentas > 0 ? totalVentas / numVentas : 0
+  const productosVendidos = ventasDia.reduce((sum, v) => sum + (v.venta_items?.length || 0), 0)
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 p-4 pb-20">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 hover:bg-gray-200 rounded-lg lg:hidden">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
-            <p className="text-gray-500">Análisis de ventas</p>
+        <div className="mb-6"><h1 className="text-2xl font-bold text-gray-800">Reportes y Corte de Caja</h1><p className="text-gray-500">Analisis de ventas reales</p></div>
+
+        {/* Selector de fecha */}
+        <div className="card p-4 mb-6 flex flex-col sm:flex-row gap-3 items-end">
+          <div className="flex-1 w-full"><label className="block text-xs font-medium text-gray-500 mb-1">Fecha del corte</label><input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="input" /></div>
+          <button onClick={handleFiltrar} className="btn-primary w-full sm:w-auto"><Calendar className="w-4 h-4" />Ver Corte</button>
+        </div>
+
+        {/* CORTE DE CAJA */}
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><Wallet className="w-5 h-5 text-blue-600" />Corte de Caja - {fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="card p-4 bg-green-50 border-green-200"><div className="flex items-center gap-2 mb-2"><DollarSign className="w-5 h-5 text-green-600" /><span className="text-sm text-gray-600">Efectivo</span></div><p className="text-2xl font-bold text-green-700">${totalEfectivo.toFixed(2)}</p></div>
+            <div className="card p-4 bg-purple-50 border-purple-200"><div className="flex items-center gap-2 mb-2"><CreditCard className="w-5 h-5 text-purple-600" /><span className="text-sm text-gray-600">Tarjeta</span></div><p className="text-2xl font-bold text-purple-700">${totalTarjeta.toFixed(2)}</p></div>
+            <div className="card p-4 bg-blue-50 border-blue-200"><div className="flex items-center gap-2 mb-2"><TrendingUp className="w-5 h-5 text-blue-600" /><span className="text-sm text-gray-600">Transferencia</span></div><p className="text-2xl font-bold text-blue-700">${totalTransferencia.toFixed(2)}</p></div>
+            <div className="card p-4 bg-orange-50 border-orange-200"><div className="flex items-center gap-2 mb-2"><Users className="w-5 h-5 text-orange-600" /><span className="text-sm text-gray-600">Credito</span></div><p className="text-2xl font-bold text-orange-700">${totalCredito.toFixed(2)}</p></div>
+            <div className="card p-4 bg-yellow-50 border-yellow-200"><div className="flex items-center gap-2 mb-2"><PiggyBank className="w-5 h-5 text-yellow-600" /><span className="text-sm text-gray-600">Ganancia Real</span></div><p className="text-2xl font-bold text-yellow-700">${ganancia.toFixed(2)}</p></div>
+            <div className="card p-4 bg-slate-50 border-slate-200"><div className="flex items-center gap-2 mb-2"><BarChart3 className="w-5 h-5 text-slate-600" /><span className="text-sm text-gray-600">Total del Dia</span></div><p className="text-2xl font-bold text-slate-800">${(totalVentas + totalCredito).toFixed(2)}</p></div>
           </div>
         </div>
 
-        {/* Selector de período */}
-        <div className="flex gap-2 mb-6">
-          {(['hoy', 'semana', 'mes'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriodo(p)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-all ${
-                periodo === p
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {p === 'hoy' ? 'Hoy' : p === 'semana' ? 'Esta Semana' : 'Este Mes'}
-            </button>
-          ))}
+        {/* Stats adicionales */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="card p-4"><div className="flex items-center gap-2 mb-2"><BarChart3 className="w-5 h-5 text-blue-600" /><span className="text-sm text-gray-500">Num. Ventas</span></div><p className="text-xl font-bold text-gray-800">{numVentas}</p></div>
+          <div className="card p-4"><div className="flex items-center gap-2 mb-2"><TrendingUp className="w-5 h-5 text-blue-600" /><span className="text-sm text-gray-500">Ticket Promedio</span></div><p className="text-xl font-bold text-gray-800">${ticketPromedio.toFixed(2)}</p></div>
+          <div className="card p-4"><div className="flex items-center gap-2 mb-2"><Package className="w-5 h-5 text-blue-600" /><span className="text-sm text-gray-500">Productos Vendidos</span></div><p className="text-xl font-bold text-gray-800">{productosVendidos}</p></div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-          <div className="card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-5 h-5 text-green-600" />
-              <span className="text-sm text-gray-500">Ventas {periodo}</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">
-              ${periodo === 'hoy' ? stats.ventasHoy.toFixed(2) : periodo === 'semana' ? stats.ventasSemana.toFixed(2) : stats.ventasMes.toFixed(2)}
-            </p>
-          </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-gray-500">Ticket Promedio</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">${stats.ticketPromedio.toFixed(2)}</p>
-          </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Package className="w-5 h-5 text-purple-600" />
-              <span className="text-sm text-gray-500">Productos Vendidos</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{stats.productosVendidos}</p>
-          </div>
-        </div>
-
-        {/* Gráficos */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          {/* Ventas por día */}
-          <div className="card p-4">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
-              Ventas por Día
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ventasPorDia}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="dia" stroke="#6b7280" fontSize={12} />
-                  <YAxis stroke="#6b7280" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                  />
-                  <Bar dataKey="ventas" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Ventas por categoría */}
-          <div className="card p-4">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-purple-600" />
-              Ventas por Categoría
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={ventasPorCategoria}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {ventasPorCategoria.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {ventasPorCategoria.map((cat) => (
-                <div key={cat.name} className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                  <span className="text-xs text-gray-600">{cat.name} ({cat.value}%)</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Productos más vendidos */}
+        {/* Detalle de ventas del dia */}
         <div className="card p-4">
-          <h3 className="font-bold text-gray-800 mb-4">Productos Más Vendidos</h3>
-          <div className="space-y-3">
-            {productosTop.map((p, i) => (
-              <div key={p.nombre} className="flex items-center gap-4">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-sm">
-                  {i + 1}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{p.nombre}</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{ width: `${(p.cantidad / 45) * 100}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm">{p.cantidad} uds</p>
-                  <p className="text-xs text-gray-500">${p.total.toFixed(2)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="font-bold text-gray-800 mb-4">Detalle del Dia</h3>
+          {loading ? (<div className="text-center py-8 text-gray-400">Cargando...</div>)
+           : ventasDia.length === 0 && creditosDia.length === 0 ? (<div className="text-center py-8 text-gray-400">No hay movimientos este dia</div>)
+           : (<div className="space-y-2">
+             {ventasDia.map((v: any) => (
+               <div key={v.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                 <div><p className="font-medium text-sm">{new Date(v.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} - <span className="capitalize">{v.metodo_pago}</span></p><p className="text-xs text-gray-500">{v.venta_items?.length || 0} productos</p></div>
+                 <span className="font-bold text-blue-600">${v.total?.toFixed(2)}</span>
+               </div>
+             ))}
+             {creditosDia.map((c: any) => (
+               <div key={c.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-100">
+                 <div><p className="font-medium text-sm">{new Date(c.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} - <span className="text-orange-600">Credito</span></p><p className="text-xs text-gray-500">{c.clientes?.nombre}</p></div>
+                 <span className="font-bold text-orange-600">${c.total?.toFixed(2)}</span>
+               </div>
+             ))}
+           </div>)}
         </div>
       </div>
     </div>

@@ -1,12 +1,11 @@
 import { useState, useRef } from 'react'
-import { ScanLine, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Check, X, Printer, Search, Package, Store, Menu, Users, History, Truck, BarChart3 } from 'lucide-react'
+import { ScanLine, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Check, X, Printer, Search, Package, Users } from 'lucide-react'
 import { useStore } from '../hooks/useStore'
 import { useProductos, useVentas, useClientes } from '../hooks/useSupabase'
 import BarcodeScanner from '../components/BarcodeScanner'
 import TecladoNumerico from '../components/TecladoNumerico'
 import Ticket from '../components/Ticket'
 import type { Producto } from '../types'
-import { Link } from 'react-router-dom'
 
 export default function Venta() {
   const { carrito, agregarProducto, quitarProducto, actualizarCantidad, limpiarCarrito, totalCarrito, cantidadItems, escanerActivo, setEscanerActivo } = useStore()
@@ -26,11 +25,10 @@ export default function Venta() {
   const [mostrarTicket, setMostrarTicket] = useState(false)
   const [ventaCompletada, setVentaCompletada] = useState<any>(null)
   const [procesando, setProcesando] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
-  const ticketRef = useRef<HTMLDivElement>(null)
-  const busquedaRef = useRef<HTMLInputElement>(null)
+  const ticketRef = useRef<<HTMLDivElement>(null)
+  const busquedaRef = useRef<<HTMLInputElement>(null)
   const total = totalCarrito()
 
   const handleBusqueda = (query: string) => {
@@ -74,43 +72,15 @@ export default function Venta() {
   const imprimirTicket = () => {
     const ventana = window.open('', '_blank')
     if (ventana && ticketRef.current) {
-      ventana.document.write(`<html><head><title>Ticket</title></head><body style="margin:0;padding:20px;display:flex;justify-content:center;">${ticketRef.current.outerHTML}</body></html>`)
+      ventana.document.write(`<<html><head><title>Ticket</title></head><body style="margin:0;padding:20px;display:flex;justify-content:center;">${ticketRef.current.outerHTML}</body></html>`)
       ventana.document.close(); ventana.print()
     }
   }
 
-  const navItems = [
-    { path: '/historial', icon: History, label: 'Historial' },
-    { path: '/productos', icon: Package, label: 'Productos' },
-    { path: '/proveedores', icon: Truck, label: 'Proveedores' },
-    { path: '/creditos', icon: Users, label: 'Creditos' },
-    { path: '/reportes', icon: BarChart3, label: 'Reportes' },
-  ]
-
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50">
       {mensaje && <div className="fixed top-4 left-4 right-4 z-50 bg-green-500 text-white p-3 rounded-xl shadow-lg text-center font-bold animate-slide-down">{mensaje}</div>}
       
-      <header className="bg-slate-900 text-white p-3 shadow-lg flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setMenuOpen(true)} className="p-2 hover:bg-slate-800 rounded-lg"><Menu className="w-6 h-6" /></button>
-          <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center"><Store className="w-6 h-6" /></div>
-          <div><h1 className="font-bold text-lg leading-tight">Miscelanea Irving</h1><p className="text-xs text-gray-400">Punto de Venta</p></div>
-        </div>
-        <div className="bg-white/10 rounded-lg px-3 py-2"><span className="text-xs text-gray-400">Items</span><span className="ml-2 font-bold text-lg">{cantidadItems()}</span></div>
-      </header>
-
-      {menuOpen && (
-        <div className="fixed inset-0 bg-slate-900/95 z-50 p-4 pt-20">
-          <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-white">Menu</h2><button onClick={() => setMenuOpen(false)} className="p-2 text-white hover:bg-slate-800 rounded-full"><X className="w-6 h-6" /></button></div>
-          <nav className="space-y-2">
-            {navItems.map(({ path, icon: Icon, label }) => (
-              <Link key={path} to={path} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-4 rounded-xl text-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all"><Icon className="w-6 h-6" /><span className="font-medium">{label}</span></Link>
-            ))}
-          </nav>
-        </div>
-      )}
-
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         <div className="flex-1 flex flex-col min-h-0">
           <div className="p-3 bg-white border-b shrink-0">

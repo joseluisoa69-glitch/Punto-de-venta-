@@ -11,7 +11,7 @@ import Creditos from './pages/Creditos'
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Venta />} />
+      <Route path="/" element={<Layout><Venta /></Layout>} />
       <Route path="/historial" element={<Layout><Historial /></Layout>} />
       <Route path="/productos" element={<Layout><Productos /></Layout>} />
       <Route path="/inventario" element={<Layout><Inventario /></Layout>} />
