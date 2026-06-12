@@ -23,6 +23,18 @@ export default function Creditos() {
 
   const verCreditos = async (c: any) => { setClienteSel(c); const data = await cargarCreditos(c.id); setCreditos(data) }
 
+  // ABRIR ABONO: carga creditos automaticamente
+  const abrirAbono = async (c: any) => {
+    setClienteSel(c)
+    const data = await cargarCreditos(c.id)
+    setCreditos(data)
+    if (data.filter((x: any) => x.estado !== 'pagado').length === 0) {
+      alert('No hay creditos pendientes')
+      return
+    }
+    setMostrarAbono(true)
+  }
+
   const handleAbono = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!clienteSel || !abonoData.monto) return
@@ -64,7 +76,7 @@ export default function Creditos() {
                    </div>
                  </div>
                  <div className="flex gap-2">
-                   <button onClick={() => { setClienteSel(c); setMostrarAbono(true); }} className="btn-success text-sm" disabled={c.saldo_actual <= 0}><DollarSign className="w-4 h-4" />Abonar</button>
+                   <button onClick={() => abrirAbono(c)} className="btn-success text-sm" disabled={c.saldo_actual <= 0}><DollarSign className="w-4 h-4" />Abonar</button>
                    <button onClick={() => verCreditos(c)} className="btn-outline text-sm"><Clock className="w-4 h-4" />Creditos</button>
                  </div>
                </div>
