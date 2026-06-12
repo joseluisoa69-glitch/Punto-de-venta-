@@ -2,10 +2,11 @@ import { createClient } from '@supabase/supabase-js'
 
 // ============================================
 // SUPABASE - MISCELANEA IRVING
+// Lee variables de entorno (Vercel) o usa valores por defecto
 // ============================================
 
-const SUPABASE_URL = 'https://ichlutncamnjpobtcqcc.supabase.co'
-const SUPABASE_ANON_KEY = 'sb_publishable_L2ayRstjkFmXMK3q7svTig_ynvlqOMr'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ichlutncamnjpobtcqcc.supabase.co'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_L2ayRstjkFmXMK3q7svTig_ynvlqOMr'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
