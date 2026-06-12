@@ -8,11 +8,11 @@ interface BarcodeScannerProps {
 }
 
 export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
-  const scannerRef = useRef<<Html5Qrcode | null>(null)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [torchOn, setTorchOn] = useState(false)
   const [escaneado, setEscaneado] = useState(false)
-  const containerRef = useRef<<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const scannerIdRef = useRef<string>('')
 
   const detenerScanner = useCallback(async () => {

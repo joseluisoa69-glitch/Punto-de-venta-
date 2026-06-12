@@ -34,8 +34,8 @@ export default function Venta() {
   const [procesando, setProcesando] = useState(false)
   const [ultimoEscaneado, setUltimoEscaneado] = useState<string>('')
 
-  const ticketRef = useRef<<HTMLDivElement>(null)
-  const busquedaRef = useRef<<HTMLInputElement>(null)
+  const ticketRef = useRef<HTMLDivElement>(null)
+  const busquedaRef = useRef<HTMLInputElement>(null)
 
   const total = totalCarrito()
 
@@ -66,9 +66,9 @@ export default function Venta() {
       setResultadosBusqueda([])
       
       // Feedback visual
-      alert(`✅ Agregado: ${producto.nombre} - $${producto.precio_venta.toFixed(2)}`)
+      alert(`âœ… Agregado: ${producto.nombre} - $${producto.precio_venta.toFixed(2)}`)
     } else {
-      alert(`❌ Producto no encontrado: ${codigo}\n\nEl codigo no existe en la base de datos. Ve a Productos para darlo de alta.`)
+      alert(`âŒ Producto no encontrado: ${codigo}\n\nEl codigo no existe en la base de datos. Ve a Productos para darlo de alta.`)
     }
   }, [buscarPorCodigo, agregarProducto])
 
