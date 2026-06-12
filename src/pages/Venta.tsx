@@ -75,7 +75,7 @@ export default function Venta() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50 pb-16 lg:pb-0">
       {mensaje && <div className="fixed top-4 left-4 right-4 z-50 bg-green-500 text-white p-3 rounded-xl shadow-lg text-center font-bold">{mensaje}</div>}
       
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
