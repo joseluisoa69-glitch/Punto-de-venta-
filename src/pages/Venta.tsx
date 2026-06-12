@@ -29,8 +29,8 @@ export default function Venta() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
-  const ticketRef = useRef<<HTMLDivElement>(null)
-  const busquedaRef = useRef<<HTMLInputElement>(null)
+  const ticketRef = useRef<HTMLDivElement>(null)
+  const busquedaRef = useRef<HTMLInputElement>(null)
   const total = totalCarrito()
 
   const handleBusqueda = (query: string) => {
@@ -74,7 +74,7 @@ export default function Venta() {
   const imprimirTicket = () => {
     const ventana = window.open('', '_blank')
     if (ventana && ticketRef.current) {
-      ventana.document.write(`<<html><head><title>Ticket</title></head><body style="margin:0;padding:20px;display:flex;justify-content:center;">${ticketRef.current.outerHTML}</body></html>`)
+      ventana.document.write(`<html><head><title>Ticket</title></head><body style="margin:0;padding:20px;display:flex;justify-content:center;">${ticketRef.current.outerHTML}</body></html>`)
       ventana.document.close(); ventana.print()
     }
   }
