@@ -5,33 +5,24 @@ import type { Producto } from '../types'
 export function useProductos() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const cargarProductos = useCallback(async () => {
     try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('productos')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
+      setLoading(true); setError(null)
+      const { data, error } = await supabase.from('productos').select('*').eq('activo', true).order('nombre')
       if (error) throw error
       setProductos(data || [])
-    } catch (err: any) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err: any) { setError(err.message); console.error(err) }
+    finally { setLoading(false) }
   }, [])
 
   const buscarPorCodigo = useCallback(async (codigo: string) => {
-    const { data, error } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('codigo_barras', codigo)
-      .eq('activo', true)
-      .single()
-    if (error || !data) return null
-    return data as Producto
+    try {
+      const { data, error } = await supabase.from('productos').select('*').eq('codigo_barras', codigo).eq('activo', true).single()
+      if (error || !data) return null
+      return data as Producto
+    } catch { return null }
   }, [])
 
   const crearProducto = useCallback(async (producto: any) => {
@@ -46,64 +37,35 @@ export function useProductos() {
     if (error) throw error
   }, [])
 
-  useEffect(() => {
-    cargarProductos()
-    const channel = supabase
-      .channel('productos_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => { cargarProductos() })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [cargarProductos])
-
-  return { productos, loading, cargarProductos, buscarPorCodigo, crearProducto, actualizarStock }
+  useEffect(() => { cargarProductos() }, [cargarProductos])
+  return { productos, loading, error, cargarProductos, buscarPorCodigo, crearProducto, actualizarStock }
 }
 
 export function useVentas() {
   const [ventas, setVentas] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  
+
   const registrarVenta = useCallback(async (items: any[], total: number, metodoPago: string, recibido: number, cambio: number) => {
-    const { data: venta, error: ventaError } = await supabase
-      .from('ventas')
-      .insert({ total, metodo_pago: metodoPago, recibido, cambio, usuario_id: 'anon' })
-      .select().single()
+    const { data: venta, error: ventaError } = await supabase.from('ventas').insert({ total, metodo_pago: metodoPago, recibido, cambio, usuario_id: 'anon' }).select().single()
     if (ventaError) throw ventaError
-    
-    const itemsConVenta = items.map(item => ({
-      venta_id: venta.id,
-      producto_id: item.producto_id,
-      cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario,
-      subtotal: item.subtotal
-    }))
+    const itemsConVenta = items.map(item => ({ venta_id: venta.id, producto_id: item.producto_id, cantidad: item.cantidad, precio_unitario: item.precio_unitario, subtotal: item.subtotal }))
     const { error: itemsError } = await supabase.from('venta_items').insert(itemsConVenta)
     if (itemsError) throw itemsError
-    
-    for (const item of items) {
-      await supabase.rpc('decrementar_stock', { p_id: item.producto_id, p_cantidad: item.cantidad })
-    }
+    for (const item of items) { await supabase.rpc('decrementar_stock', { p_id: item.producto_id, p_cantidad: item.cantidad }) }
     return venta
   }, [])
 
   const cargarVentas = useCallback(async (fechaInicio?: string, fechaFin?: string) => {
     setLoading(true)
     try {
-      let query = supabase
-        .from('ventas')
-        .select('*, venta_items(*, productos(nombre, codigo_barras))')
-        .order('created_at', { ascending: false })
-      if (fechaInicio && fechaFin) {
-        query = query.gte('created_at', `${fechaInicio}T00:00:00`).lte('created_at', `${fechaFin}T23:59:59`)
-      } else if (fechaInicio) {
-        query = query.gte('created_at', `${fechaInicio}T00:00:00`).lte('created_at', `${fechaInicio}T23:59:59`)
-      }
-      const { data } = await query
+      let query = supabase.from('ventas').select('*, venta_items(*, productos(nombre, codigo_barras))').order('created_at', { ascending: false })
+      if (fechaInicio && fechaFin) { query = query.gte('created_at', fechaInicio + 'T00:00:00').lte('created_at', fechaFin + 'T23:59:59') }
+      else if (fechaInicio) { query = query.gte('created_at', fechaInicio + 'T00:00:00').lte('created_at', fechaInicio + 'T23:59:59') }
+      const { data, error } = await query
+      if (error) throw error
       setVentas(data || [])
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { console.error(err); setVentas([]) }
+    finally { setLoading(false) }
   }, [])
 
   return { ventas, loading, registrarVenta, cargarVentas }
@@ -115,9 +77,12 @@ export function useProveedores() {
 
   const cargarProveedores = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('proveedores').select('*').eq('activo', true).order('nombre')
-    setProveedores(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from('proveedores').select('*').eq('activo', true).order('nombre')
+      if (error) throw error
+      setProveedores(data || [])
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
   }, [])
 
   const crearProveedor = useCallback(async (proveedor: any) => {
@@ -150,9 +115,12 @@ export function useClientes() {
 
   const cargarClientes = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('clientes').select('*').eq('activo', true).order('nombre')
-    setClientes(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from('clientes').select('*').eq('activo', true).order('nombre')
+      if (error) throw error
+      setClientes(data || [])
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
   }, [])
 
   const crearCliente = useCallback(async (cliente: any) => {
@@ -164,11 +132,7 @@ export function useClientes() {
 
   const registrarCredito = useCallback(async (clienteId: string, items: any[], total: number) => {
     const { data: credito, error } = await supabase.from('creditos').insert({
-      cliente_id: clienteId,
-      total,
-      saldo_pendiente: total,
-      estado: 'pendiente',
-      items: JSON.stringify(items)
+      cliente_id: clienteId, total, saldo_pendiente: total, estado: 'pendiente', items: JSON.stringify(items)
     }).select().single()
     if (error) throw error
     await supabase.rpc('incrementar_saldo_cliente', { p_id: clienteId, p_monto: total })
@@ -183,12 +147,7 @@ export function useClientes() {
   }, [])
 
   const registrarAbono = useCallback(async (creditoId: string, clienteId: string, monto: number) => {
-    const { data, error } = await supabase.from('pagos_creditos').insert({
-      credito_id: creditoId,
-      cliente_id: clienteId,
-      monto,
-      metodo_pago: 'efectivo'
-    }).select().single()
+    const { data, error } = await supabase.from('pagos_creditos').insert({ credito_id: creditoId, cliente_id: clienteId, monto, metodo_pago: 'efectivo' }).select().single()
     if (error) throw error
     await supabase.rpc('abonar_credito', { p_id: creditoId, p_monto: monto })
     await supabase.rpc('decrementar_saldo_cliente', { p_id: clienteId, p_monto: monto })
