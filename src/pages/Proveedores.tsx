@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Truck, Plus, Search, DollarSign, Save, X, ArrowLeft, History, User } from 'lucide-react'
+import { Truck, Plus, Search, DollarSign, Save, X, History } from 'lucide-react'
 import { useProveedores } from '../hooks/useSupabase'
 import { Link } from 'react-router-dom'
 

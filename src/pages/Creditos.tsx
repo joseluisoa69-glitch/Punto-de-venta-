@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, Plus, Search, DollarSign, Save, X, ArrowLeft, Calendar, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import { Users, Plus, Search, DollarSign, Save, X, Calendar, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 import { useClientes } from '../hooks/useSupabase'
 import { Link } from 'react-router-dom'
 

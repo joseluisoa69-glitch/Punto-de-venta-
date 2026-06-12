@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, DollarSign, Search, Filter, ShoppingBag, ArrowLeft, Download } from 'lucide-react'
+import { Calendar, Clock, DollarSign, Search, Filter, ShoppingBag, Download } from 'lucide-react'
 import { useVentas } from '../hooks/useSupabase'
 import { Link } from 'react-router-dom'
 
