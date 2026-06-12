@@ -5,7 +5,6 @@ import { useProductos, useVentas, useClientes } from '../hooks/useSupabase'
 import BarcodeScanner from '../components/BarcodeScanner'
 import TecladoNumerico from '../components/TecladoNumerico'
 import Ticket from '../components/Ticket'
-import type { Producto } from '../types'
 
 export default function Venta() {
   const { carrito, agregarProducto, quitarProducto, actualizarCantidad, limpiarCarrito, totalCarrito, cantidadItems, escanerActivo, setEscanerActivo } = useStore()
@@ -14,41 +13,40 @@ export default function Venta() {
   const { clientes, registrarCredito } = useClientes()
 
   const [busqueda, setBusqueda] = useState('')
-  const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([])
+  const [resultados, setResultados] = useState([])
   const [mostrarTeclado, setMostrarTeclado] = useState(false)
-  const [productoTeclado, setProductoTeclado] = useState<Producto | null>(null)
+  const [productoTeclado, setProductoTeclado] = useState(null)
   const [mostrarPago, setMostrarPago] = useState(false)
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'tarjeta' | 'transferencia' | 'credito'>('efectivo')
+  const [metodoPago, setMetodoPago] = useState('efectivo')
   const [recibido, setRecibido] = useState(0)
   const [cambio, setCambio] = useState(0)
   const [clienteCredito, setClienteCredito] = useState('')
   const [mostrarTicket, setMostrarTicket] = useState(false)
-  const [ventaCompletada, setVentaCompletada] = useState<any>(null)
+  const [ventaOk, setVentaOk] = useState(null)
   const [procesando, setProcesando] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
-  const ticketRef = useRef<<HTMLDivElement>(null)
-  const busquedaRef = useRef<<HTMLInputElement>(null)
+  const ticketRef = useRef(null)
+  const busquedaRef = useRef(null)
   const total = totalCarrito()
 
-  const handleBusqueda = (query: string) => {
+  const handleBusqueda = (query) => {
     setBusqueda(query)
     if (query.length > 1) {
-      const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(query.toLowerCase()) || p.codigo_barras.includes(query)).slice(0, 10)
-      setResultadosBusqueda(filtrados)
-    } else { setResultadosBusqueda([]) }
+      setResultados(productos.filter(p => p.nombre.toLowerCase().includes(query.toLowerCase()) || p.codigo_barras.includes(query)).slice(0, 10))
+    } else { setResultados([]) }
   }
 
-  const handleScan = async (codigo: string) => {
+  const handleScan = async (codigo) => {
     const producto = await buscarPorCodigo(codigo)
     if (producto) { agregarProducto(producto); setBusqueda('') }
     else { setMensaje('Producto no encontrado: ' + codigo); setTimeout(() => setMensaje(''), 3000) }
   }
 
-  const agregarDesdeBusqueda = (producto: Producto) => { agregarProducto(producto); setBusqueda(''); setResultadosBusqueda([]); busquedaRef.current?.focus() }
-  const abrirTeclado = (producto: Producto) => { setProductoTeclado(producto); setMostrarTeclado(true) }
-  const confirmarCantidad = (cantidad: number) => { if (productoTeclado) agregarProducto(productoTeclado, cantidad); setMostrarTeclado(false); setProductoTeclado(null) }
-  const calcularCambio = (monto: number) => { setRecibido(monto); setCambio(Math.max(0, monto - total)) }
+  const agregarDesdeBusqueda = (producto) => { agregarProducto(producto); setBusqueda(''); setResultados([]); busquedaRef.current?.focus() }
+  const abrirTeclado = (producto) => { setProductoTeclado(producto); setMostrarTeclado(true) }
+  const confirmarCantidad = (cantidad) => { if (productoTeclado) agregarProducto(productoTeclado, cantidad); setMostrarTeclado(false); setProductoTeclado(null) }
+  const calcularCambio = (monto) => { setRecibido(monto); setCambio(Math.max(0, monto - total)) }
 
   const procesarVenta = async () => {
     if (carrito.length === 0) return
@@ -57,29 +55,28 @@ export default function Venta() {
     try {
       if (metodoPago === 'credito') {
         await registrarCredito(clienteCredito, carrito, total)
-        setMensaje('Credito registrado correctamente')
-        setTimeout(() => setMensaje(''), 4000)
+        setMensaje('Credito registrado correctamente'); setTimeout(() => setMensaje(''), 4000)
       } else {
         await registrarVenta(carrito, total, metodoPago, recibido, cambio)
-        setVentaCompletada({ items: carrito, total, recibido, cambio, metodoPago, fecha: new Date().toLocaleString('es-MX') })
+        setVentaOk({ items: carrito, total, recibido, cambio, metodoPago, fecha: new Date().toLocaleString('es-MX') })
         setMostrarTicket(true)
       }
       setMostrarPago(false); limpiarCarrito(); setRecibido(0); setCambio(0); setClienteCredito(''); setMetodoPago('efectivo')
-    } catch (err: any) { alert('Error: ' + err.message) }
+    } catch (err) { alert('Error: ' + err.message) }
     finally { setProcesando(false) }
   }
 
   const imprimirTicket = () => {
     const ventana = window.open('', '_blank')
     if (ventana && ticketRef.current) {
-      ventana.document.write(`<<html><head><title>Ticket</title></head><body style="margin:0;padding:20px;display:flex;justify-content:center;">${ticketRef.current.outerHTML}</body></html>`)
+      ventana.document.write('<html><head><title>Ticket</title></head><body style="margin:0;padding:20px;display:flex;justify-content:center;">' + ticketRef.current.outerHTML + '</body></html>')
       ventana.document.close(); ventana.print()
     }
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50">
-      {mensaje && <div className="fixed top-4 left-4 right-4 z-50 bg-green-500 text-white p-3 rounded-xl shadow-lg text-center font-bold animate-slide-down">{mensaje}</div>}
+    <div className="h-full flex flex-col bg-gray-50">
+      {mensaje && <div className="fixed top-4 left-4 right-4 z-50 bg-green-500 text-white p-3 rounded-xl shadow-lg text-center font-bold">{mensaje}</div>}
       
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         <div className="flex-1 flex flex-col min-h-0">
@@ -89,9 +86,9 @@ export default function Venta() {
               <input ref={busquedaRef} type="text" value={busqueda} onChange={(e) => handleBusqueda(e.target.value)} placeholder="Buscar producto o escanear..." className="input pl-12" />
               <button onClick={() => setEscanerActivo(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><ScanLine className="w-5 h-5" /></button>
             </div>
-            {resultadosBusqueda.length > 0 && (
+            {resultados.length > 0 && (
               <div className="absolute z-20 left-3 right-3 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 max-h-64 overflow-y-auto">
-                {resultadosBusqueda.map(p => (
+                {resultados.map(p => (
                   <button key={p.id} onClick={() => agregarDesdeBusqueda(p)} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left">
                     <Package className="w-8 h-8 text-gray-400" /><div className="flex-1"><p className="font-medium text-sm">{p.nombre}</p><p className="text-xs text-gray-500">{p.codigo_barras}</p></div>
                     <div className="text-right"><p className="font-bold text-blue-600">${p.precio_venta.toFixed(2)}</p><p className="text-xs text-gray-500">Stock: {p.stock}</p></div>
@@ -138,7 +135,7 @@ export default function Venta() {
       </div>
 
       {escanerActivo && <BarcodeScanner onScan={handleScan} onClose={() => setEscanerActivo(false)} />}
-      <TecladoNumerico visible={mostrarTeclado} titulo={`Cantidad: ${productoTeclado?.nombre}`} onConfirmar={confirmarCantidad} onCancelar={() => setMostrarTeclado(false)} />
+      <TecladoNumerico visible={mostrarTeclado} titulo={`Cantidad: ${productoTeclado?.nombre || ''}`} onConfirmar={confirmarCantidad} onCancelar={() => setMostrarTeclado(false)} />
 
       {mostrarPago && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -146,7 +143,7 @@ export default function Venta() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Procesar pago</h2>
             <div className="text-center mb-4"><p className="text-gray-500 text-sm">Total a pagar</p><p className="text-3xl font-bold text-slate-900">${total.toFixed(2)}</p></div>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              {([{ id: 'efectivo' as const, icon: Banknote, label: 'Efectivo' },{ id: 'tarjeta' as const, icon: CreditCard, label: 'Tarjeta' },{ id: 'transferencia' as const, icon: Smartphone, label: 'Transfer' },{ id: 'credito' as const, icon: Users, label: 'Credito' }]).map(({ id, icon: Icon, label }) => (
+              {[{ id: 'efectivo', icon: Banknote, label: 'Efectivo' },{ id: 'tarjeta', icon: CreditCard, label: 'Tarjeta' },{ id: 'transferencia', icon: Smartphone, label: 'Transfer' },{ id: 'credito', icon: Users, label: 'Credito' }].map(({ id, icon: Icon, label }) => (
                 <button key={id} onClick={() => setMetodoPago(id)} className={`p-2 rounded-xl border-2 flex flex-col items-center gap-1 transition-all ${metodoPago === id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300'}`}><Icon className="w-5 h-5" /><span className="text-xs font-medium">{label}</span></button>
               ))}
             </div>
@@ -163,7 +160,7 @@ export default function Venta() {
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
                   <select value={clienteCredito} onChange={(e) => setClienteCredito(e.target.value)} className="select" required>
                     <option value="">Seleccionar cliente...</option>
-                    {clientes.map((c: any) => (<option key={c.id} value={c.id}>{c.nombre} (Limite: ${c.limite_credito?.toFixed(2)} - Saldo: ${c.saldo_actual?.toFixed(2)})</option>))}
+                    {clientes.map((c) => (<option key={c.id} value={c.id}>{c.nombre} (Limite: ${c.limite_credito?.toFixed(2)} - Saldo: ${c.saldo_actual?.toFixed(2)})</option>))}
                   </select>
                 </div>
                 {clienteCredito && <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800"><p>Se registrara un credito por <strong>${total.toFixed(2)}</strong></p><p className="text-xs mt-1">El stock se descontara automaticamente.</p></div>}
@@ -180,14 +177,14 @@ export default function Venta() {
         </div>
       )}
 
-      {mostrarTicket && ventaCompletada && (
+      {mostrarTicket && ventaOk && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 animate-slide-up">
             <div className="text-center mb-4"><div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2"><Check className="w-7 h-7 text-green-600" /></div><h2 className="text-xl font-bold text-gray-800">Venta Exitosa!</h2></div>
-            <div className="hidden"><Ticket ref={ticketRef} items={ventaCompletada.items} total={ventaCompletada.total} recibido={ventaCompletada.recibido} cambio={ventaCompletada.cambio} metodoPago={ventaCompletada.metodoPago} fecha={ventaCompletada.fecha} /></div>
+            <div className="hidden"><Ticket ref={ticketRef} items={ventaOk.items} total={ventaOk.total} recibido={ventaOk.recibido} cambio={ventaOk.cambio} metodoPago={ventaOk.metodoPago} fecha={ventaOk.fecha} /></div>
             <div className="space-y-2">
               <button onClick={imprimirTicket} className="btn-primary w-full"><Printer className="w-5 h-5" />Imprimir Ticket</button>
-              <button onClick={() => { setMostrarTicket(false); setVentaCompletada(null); }} className="btn-outline w-full">Nueva Venta</button>
+              <button onClick={() => { setMostrarTicket(false); setVentaOk(null); }} className="btn-outline w-full">Nueva Venta</button>
             </div>
           </div>
         </div>
