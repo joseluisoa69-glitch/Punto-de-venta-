@@ -17,7 +17,7 @@ export function useProductos() {
       if (error) throw error
       setProductos(data || [])
     } catch (err: any) {
-      console.error('Error cargando productos:', err)
+      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -35,39 +35,40 @@ export function useProductos() {
   }, [])
 
   const crearProducto = useCallback(async (producto: any) => {
-    const { data, error } = await supabase
-      .from('productos')
-      .insert(producto)
-      .select()
-      .single()
+    const { data, error } = await supabase.from('productos').insert(producto).select().single()
     if (error) throw error
     await cargarProductos()
     return data
   }, [cargarProductos])
 
+  const actualizarStock = useCallback(async (productoId: string, cantidad: number) => {
+    const { error } = await supabase.rpc('decrementar_stock', { p_id: productoId, p_cantidad: cantidad })
+    if (error) throw error
+  }, [])
+
   useEffect(() => {
     cargarProductos()
     const channel = supabase
       .channel('productos_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
-        cargarProductos()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => { cargarProductos() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [cargarProductos])
 
-  return { productos, loading, cargarProductos, buscarPorCodigo, crearProducto }
+  return { productos, loading, cargarProductos, buscarPorCodigo, crearProducto, actualizarStock }
 }
 
 export function useVentas() {
+  const [ventas, setVentas] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  
   const registrarVenta = useCallback(async (items: any[], total: number, metodoPago: string, recibido: number, cambio: number) => {
     const { data: venta, error: ventaError } = await supabase
       .from('ventas')
       .insert({ total, metodo_pago: metodoPago, recibido, cambio, usuario_id: 'anon' })
-      .select()
-      .single()
+      .select().single()
     if (ventaError) throw ventaError
-
+    
     const itemsConVenta = items.map(item => ({
       venta_id: venta.id,
       producto_id: item.producto_id,
@@ -75,70 +76,29 @@ export function useVentas() {
       precio_unitario: item.precio_unitario,
       subtotal: item.subtotal
     }))
-    
     const { error: itemsError } = await supabase.from('venta_items').insert(itemsConVenta)
     if (itemsError) throw itemsError
-
+    
     for (const item of items) {
       await supabase.rpc('decrementar_stock', { p_id: item.producto_id, p_cantidad: item.cantidad })
     }
     return venta
   }, [])
 
-  const registrarVentaCredito = useCallback(async (items: any[], total: number, clienteId: string, clienteNombre: string) => {
-    // Crear credito
-    const { data: credito, error: creditoError } = await supabase
-      .from('creditos')
-      .insert({
-        cliente_id: clienteId,
-        total: total,
-        saldo_pendiente: total,
-        estado: 'pendiente',
-        items: JSON.stringify(items.map(i => ({ nombre: i.producto?.nombre, cantidad: i.cantidad, precio: i.precio_unitario })))
-      })
-      .select()
-      .single()
-    if (creditoError) throw creditoError
-
-    // Descontar stock
-    for (const item of items) {
-      await supabase.rpc('decrementar_stock', { p_id: item.producto_id, p_cantidad: item.cantidad })
-    }
-
-    // Actualizar saldo del cliente
-    await supabase.rpc('incrementar_saldo_cliente', { p_id: clienteId, p_monto: total })
-
-    return credito
-  }, [])
-
-  const cargarVentasPorFecha = useCallback(async (fechaInicio: string, fechaFin: string) => {
-    const { data, error } = await supabase
-      .from('ventas')
-      .select('*, venta_items(*)')
-      .gte('created_at', `${fechaInicio}T00:00:00`)
-      .lte('created_at', `${fechaFin}T23:59:59`)
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data || []
-  }, [])
-
-  return { registrarVenta, registrarVentaCredito, cargarVentasPorFecha }
-}
-
-export function useProveedores() {
-  const [proveedores, setProveedores] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const cargarProveedores = useCallback(async () => {
+  const cargarVentas = useCallback(async (fechaInicio?: string, fechaFin?: string) => {
+    setLoading(true)
     try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('proveedores')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
-      if (error) throw error
-      setProveedores(data || [])
+      let query = supabase
+        .from('ventas')
+        .select('*, venta_items(*, productos(nombre, codigo_barras))')
+        .order('created_at', { ascending: false })
+      if (fechaInicio && fechaFin) {
+        query = query.gte('created_at', `${fechaInicio}T00:00:00`).lte('created_at', `${fechaFin}T23:59:59`)
+      } else if (fechaInicio) {
+        query = query.gte('created_at', `${fechaInicio}T00:00:00`).lte('created_at', `${fechaInicio}T23:59:59`)
+      }
+      const { data } = await query
+      setVentas(data || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -146,132 +106,95 @@ export function useProveedores() {
     }
   }, [])
 
+  return { ventas, loading, registrarVenta, cargarVentas }
+}
+
+export function useProveedores() {
+  const [proveedores, setProveedores] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const cargarProveedores = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('proveedores').select('*').eq('activo', true).order('nombre')
+    setProveedores(data || [])
+    setLoading(false)
+  }, [])
+
   const crearProveedor = useCallback(async (proveedor: any) => {
-    const { data, error } = await supabase
-      .from('proveedores')
-      .insert(proveedor)
-      .select()
-      .single()
-    if (error) {
-      alert('Error: ' + error.message)
-      throw error
-    }
+    const { data, error } = await supabase.from('proveedores').insert(proveedor).select().single()
+    if (error) throw error
     await cargarProveedores()
     return data
   }, [cargarProveedores])
 
   const registrarPago = useCallback(async (pago: any) => {
-    const { data, error } = await supabase
-      .from('pagos_proveedores')
-      .insert(pago)
-      .select()
-      .single()
-    if (error) {
-      alert('Error: ' + error.message)
-      throw error
-    }
+    const { data, error } = await supabase.from('pagos_proveedores').insert(pago).select().single()
+    if (error) throw error
     return data
   }, [])
 
-  useEffect(() => {
-    cargarProveedores()
-  }, [cargarProveedores])
+  const cargarPagos = useCallback(async (proveedorId?: string) => {
+    let query = supabase.from('pagos_proveedores').select('*, proveedores(nombre)').order('created_at', { ascending: false })
+    if (proveedorId) query = query.eq('proveedor_id', proveedorId)
+    const { data } = await query
+    return data || []
+  }, [])
 
-  return { proveedores, loading, cargarProveedores, crearProveedor, registrarPago }
+  useEffect(() => { cargarProveedores() }, [cargarProveedores])
+  return { proveedores, loading, cargarProveedores, crearProveedor, registrarPago, cargarPagos }
 }
 
 export function useClientes() {
   const [clientes, setClientes] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   const cargarClientes = useCallback(async () => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
-      if (error) throw error
-      setClientes(data || [])
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+    setLoading(true)
+    const { data } = await supabase.from('clientes').select('*').eq('activo', true).order('nombre')
+    setClientes(data || [])
+    setLoading(false)
   }, [])
 
   const crearCliente = useCallback(async (cliente: any) => {
-    const { data, error } = await supabase
-      .from('clientes')
-      .insert(cliente)
-      .select()
-      .single()
-    if (error) {
-      alert('Error: ' + error.message)
-      throw error
-    }
+    const { data, error } = await supabase.from('clientes').insert(cliente).select().single()
+    if (error) throw error
     await cargarClientes()
     return data
   }, [cargarClientes])
 
-  const crearCredito = useCallback(async (credito: any) => {
-    const { data, error } = await supabase
-      .from('creditos')
-      .insert(credito)
-      .select()
-      .single()
-    if (error) {
-      alert('Error: ' + error.message)
-      throw error
-    }
-    return data
-  }, [])
-
-  const registrarAbono = useCallback(async (abono: any) => {
-    const { data, error } = await supabase
-      .from('pagos_creditos')
-      .insert(abono)
-      .select()
-      .single()
-    if (error) {
-      alert('Error: ' + error.message)
-      throw error
-    }
-    
-    const { data: credito } = await supabase
-      .from('creditos')
-      .select('saldo_pendiente')
-      .eq('id', abono.credito_id)
-      .single()
-      
-    if (credito) {
-      const nuevoSaldo = Math.max(0, credito.saldo_pendiente - abono.monto)
-      await supabase
-        .from('creditos')
-        .update({ 
-          saldo_pendiente: nuevoSaldo,
-          estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial'
-        })
-        .eq('id', abono.credito_id)
-    }
-    return data
+  const registrarCredito = useCallback(async (clienteId: string, items: any[], total: number) => {
+    const { data: credito, error } = await supabase.from('creditos').insert({
+      cliente_id: clienteId,
+      total,
+      saldo_pendiente: total,
+      estado: 'pendiente',
+      items: JSON.stringify(items)
+    }).select().single()
+    if (error) throw error
+    await supabase.rpc('incrementar_saldo_cliente', { p_id: clienteId, p_monto: total })
+    return credito
   }, [])
 
   const cargarCreditos = useCallback(async (clienteId?: string) => {
-    let query = supabase
-      .from('creditos')
-      .select('*, clientes(nombre, telefono)')
-      .order('created_at', { ascending: false })
+    let query = supabase.from('creditos').select('*, clientes(nombre, telefono, limite_credito, saldo_actual)').order('created_at', { ascending: false })
     if (clienteId) query = query.eq('cliente_id', clienteId)
-    const { data, error } = await query
-    if (error) return []
+    const { data } = await query
     return data || []
   }, [])
 
-  useEffect(() => {
-    cargarClientes()
-  }, [cargarClientes])
+  const registrarAbono = useCallback(async (creditoId: string, clienteId: string, monto: number) => {
+    const { data, error } = await supabase.from('pagos_creditos').insert({
+      credito_id: creditoId,
+      cliente_id: clienteId,
+      monto,
+      metodo_pago: 'efectivo'
+    }).select().single()
+    if (error) throw error
+    await supabase.rpc('abonar_credito', { p_id: creditoId, p_monto: monto })
+    await supabase.rpc('decrementar_saldo_cliente', { p_id: clienteId, p_monto: monto })
+    return data
+  }, [])
 
-  return { clientes, loading, cargarClientes, crearCliente, crearCredito, registrarAbono, cargarCreditos }
+  useEffect(() => { cargarClientes() }, [cargarClientes])
+  return { clientes, loading, cargarClientes, crearCliente, registrarCredito, cargarCreditos, registrarAbono }
 }
