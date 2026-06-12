@@ -1,37 +1,60 @@
 import { useState } from 'react'
-import { Plus, Search, Package, Edit, Trash2, Save, X } from 'lucide-react'
 import { useProductos } from '../hooks/useSupabase'
-import type { Producto } from '../types'
+import { Plus, Search, Package, Edit, Trash2, Save, X, ScanBarcode, Camera } from 'lucide-react'
+import BarcodeScanner from '../components/BarcodeScanner'
+import { Link } from 'react-router-dom'
 
 export default function Productos() {
   const { productos, loading, crearProducto } = useProductos()
   const [mostrarForm, setMostrarForm] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [mostrarScanner, setMostrarScanner] = useState(false)
 
   const [nuevoProducto, setNuevoProducto] = useState({
     codigo_barras: '',
     nombre: '',
-    precio_venta: 0,
-    precio_compra: 0,
-    stock: 0,
-    stock_minimo: 5,
+    precio_venta: '',
+    precio_compra: '',
+    stock: '',
+    stock_minimo: '5',
     categoria: 'general',
     unidad: 'pz',
     activo: true
   })
 
+  const handleScanProducto = (codigo: string) => {
+    setNuevoProducto(prev => ({ ...prev, codigo_barras: codigo }))
+    setMostrarScanner(false)
+    alert(`Codigo escaneado: ${codigo}`)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!nuevoProducto.nombre || !nuevoProducto.codigo_barras) {
+      alert('Nombre y codigo de barras son obligatorios')
+      return
+    }
     try {
-      await crearProducto(nuevoProducto)
+      await crearProducto({
+        codigo_barras: nuevoProducto.codigo_barras,
+        nombre: nuevoProducto.nombre,
+        precio_venta: parseFloat(nuevoProducto.precio_venta) || 0,
+        precio_compra: parseFloat(nuevoProducto.precio_compra) || 0,
+        stock: parseInt(nuevoProducto.stock) || 0,
+        stock_minimo: parseInt(nuevoProducto.stock_minimo) || 5,
+        categoria: nuevoProducto.categoria,
+        unidad: nuevoProducto.unidad,
+        activo: true
+      })
+      alert('Producto creado exitosamente!')
       setMostrarForm(false)
       setNuevoProducto({
         codigo_barras: '',
         nombre: '',
-        precio_venta: 0,
-        precio_compra: 0,
-        stock: 0,
-        stock_minimo: 5,
+        precio_venta: '',
+        precio_compra: '',
+        stock: '',
+        stock_minimo: '5',
         categoria: 'general',
         unidad: 'pz',
         activo: true
@@ -47,24 +70,19 @@ export default function Productos() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 p-4 pb-20">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Productos</h1>
-            <p className="text-gray-500">Gestión de inventario</p>
+            <p className="text-gray-500">Gestion de inventario</p>
           </div>
-          <button
-            onClick={() => setMostrarForm(true)}
-            className="btn-primary"
-          >
+          <button onClick={() => setMostrarForm(true)} className="btn-primary">
             <Plus className="w-5 h-5" />
             Nuevo Producto
           </button>
         </div>
 
-        {/* Búsqueda */}
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -76,18 +94,16 @@ export default function Productos() {
           />
         </div>
 
-        {/* Lista de productos */}
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b">
                   <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Producto</th>
-                  <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Código</th>
+                  <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Codigo</th>
                   <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Precio</th>
                   <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Stock</th>
                   <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
-                  <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,16 +132,6 @@ export default function Productos() {
                         {p.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
-                    <td className="p-3 text-center">
-                      <div className="flex justify-center gap-1">
-                        <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -134,10 +140,10 @@ export default function Productos() {
         </div>
       </div>
 
-      {/* Modal Nuevo Producto */}
+      {/* Modal Nuevo Producto con Escaner */}
       {mostrarForm && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-slide-up my-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Nuevo Producto</h2>
               <button onClick={() => setMostrarForm(false)} className="p-2 hover:bg-gray-100 rounded-full">
@@ -146,41 +152,52 @@ export default function Productos() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Código de Barras</label>
+              {/* Codigo de Barras con Escaner */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Codigo de Barras *</label>
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={nuevoProducto.codigo_barras}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, codigo_barras: e.target.value })}
-                    className="input"
-                    placeholder="Escanea o escribe"
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, codigo_barras: e.target.value})}
+                    placeholder="Escanea o escribe el codigo"
+                    className="input flex-1"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarScanner(true)}
+                    className="btn-primary px-3"
+                    title="Escanear codigo"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                  <input
-                    type="text"
-                    value={nuevoProducto.nombre}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })}
-                    className="input"
-                    placeholder="Nombre del producto"
-                    required
-                  />
-                </div>
+                <p className="text-xs text-gray-500 mt-1">Click en la camara para escanear automatico</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={nuevoProducto.nombre}
+                  onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})}
+                  placeholder="Nombre del producto"
+                  className="input"
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta *</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={nuevoProducto.precio_venta || ''}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio_venta: parseFloat(e.target.value) })}
-                    className="input"
+                    value={nuevoProducto.precio_venta}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, precio_venta: e.target.value})}
                     placeholder="0.00"
+                    className="input"
                     required
                   />
                 </div>
@@ -189,11 +206,10 @@ export default function Productos() {
                   <input
                     type="number"
                     step="0.01"
-                    value={nuevoProducto.precio_compra || ''}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio_compra: parseFloat(e.target.value) })}
-                    className="input"
+                    value={nuevoProducto.precio_compra}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, precio_compra: e.target.value})}
                     placeholder="0.00"
-                    required
+                    className="input"
                   />
                 </div>
               </div>
@@ -203,28 +219,27 @@ export default function Productos() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
                   <input
                     type="number"
-                    value={nuevoProducto.stock || ''}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, stock: parseInt(e.target.value) })}
-                    className="input"
+                    value={nuevoProducto.stock}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, stock: e.target.value})}
                     placeholder="0"
-                    required
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Minimo</label>
                   <input
                     type="number"
-                    value={nuevoProducto.stock_minimo || ''}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, stock_minimo: parseInt(e.target.value) })}
-                    className="input"
+                    value={nuevoProducto.stock_minimo}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, stock_minimo: e.target.value})}
                     placeholder="5"
+                    className="input"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
                   <select
                     value={nuevoProducto.unidad}
-                    onChange={(e) => setNuevoProducto({ ...nuevoProducto, unidad: e.target.value })}
+                    onChange={(e) => setNuevoProducto({...nuevoProducto, unidad: e.target.value})}
                     className="select"
                   >
                     <option value="pz">Pieza</option>
@@ -236,10 +251,10 @@ export default function Productos() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
                 <select
                   value={nuevoProducto.categoria}
-                  onChange={(e) => setNuevoProducto({ ...nuevoProducto, categoria: e.target.value })}
+                  onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})}
                   className="select"
                 >
                   <option value="general">General</option>
@@ -264,6 +279,14 @@ export default function Productos() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Escaner para codigo de producto */}
+      {mostrarScanner && (
+        <BarcodeScanner
+          onScan={handleScanProducto}
+          onClose={() => setMostrarScanner(false)}
+        />
       )}
     </div>
   )

@@ -85,6 +85,32 @@ export function useVentas() {
     return venta
   }, [])
 
+  const registrarVentaCredito = useCallback(async (items: any[], total: number, clienteId: string, clienteNombre: string) => {
+    // Crear credito
+    const { data: credito, error: creditoError } = await supabase
+      .from('creditos')
+      .insert({
+        cliente_id: clienteId,
+        total: total,
+        saldo_pendiente: total,
+        estado: 'pendiente',
+        items: JSON.stringify(items.map(i => ({ nombre: i.producto?.nombre, cantidad: i.cantidad, precio: i.precio_unitario })))
+      })
+      .select()
+      .single()
+    if (creditoError) throw creditoError
+
+    // Descontar stock
+    for (const item of items) {
+      await supabase.rpc('decrementar_stock', { p_id: item.producto_id, p_cantidad: item.cantidad })
+    }
+
+    // Actualizar saldo del cliente
+    await supabase.rpc('incrementar_saldo_cliente', { p_id: clienteId, p_monto: total })
+
+    return credito
+  }, [])
+
   const cargarVentasPorFecha = useCallback(async (fechaInicio: string, fechaFin: string) => {
     const { data, error } = await supabase
       .from('ventas')
@@ -96,7 +122,7 @@ export function useVentas() {
     return data || []
   }, [])
 
-  return { registrarVenta, cargarVentasPorFecha }
+  return { registrarVenta, registrarVentaCredito, cargarVentasPorFecha }
 }
 
 export function useProveedores() {
@@ -235,7 +261,7 @@ export function useClientes() {
   const cargarCreditos = useCallback(async (clienteId?: string) => {
     let query = supabase
       .from('creditos')
-      .select('*, clientes(nombre)')
+      .select('*, clientes(nombre, telefono)')
       .order('created_at', { ascending: false })
     if (clienteId) query = query.eq('cliente_id', clienteId)
     const { data, error } = await query

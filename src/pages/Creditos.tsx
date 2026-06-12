@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useClientes } from '../hooks/useSupabase'
-import { Users, Plus, DollarSign, Save, X, ArrowLeft, UserPlus, CreditCard, Phone, MapPin } from 'lucide-react'
+import { Users, Plus, DollarSign, Save, X, ArrowLeft, UserPlus, CreditCard, Phone, MapPin, Search, History, CheckCircle, Clock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function Creditos() {
@@ -11,201 +11,273 @@ export default function Creditos() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any>(null)
   const [creditoSeleccionado, setCreditoSeleccionado] = useState<any>(null)
   const [creditos, setCreditos] = useState<any[]>([])
+  const [busquedaCliente, setBusquedaCliente] = useState('')
+  const [tabActiva, setTabActiva] = useState<'activos' | 'pagados' | 'clientes'>('clientes')
+  const [clienteExpandido, setClienteExpandido] = useState<string | null>(null)
+  const [creditosCliente, setCreditosCliente] = useState<any[]>([])
   
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', telefono: '', direccion: '', limite_credito: '500' })
   const [nuevoCredito, setNuevoCredito] = useState({ total: '', descripcion: '' })
   const [nuevoAbono, setNuevoAbono] = useState({ monto: '', metodo_pago: 'efectivo', notas: '' })
 
-  useEffect(() => {
-    cargarCreditosList()
-  }, [])
+  useEffect(() => { cargarCreditosList() }, [])
 
   const cargarCreditosList = async () => {
     const data = await cargarCreditos()
     setCreditos(data)
   }
 
-  const handleCrearCliente = async () => {
-    if (!nuevoCliente.nombre.trim()) {
-      alert('El nombre es obligatorio')
+  const verHistorialCliente = async (clienteId: string) => {
+    if (clienteExpandido === clienteId) {
+      setClienteExpandido(null)
       return
     }
+    const data = await cargarCreditos(clienteId)
+    setCreditosCliente(data)
+    setClienteExpandido(clienteId)
+  }
+
+  const handleCrearCliente = async () => {
+    if (!nuevoCliente.nombre.trim()) { alert('El nombre es obligatorio'); return }
     try {
-      await crearCliente({
-        nombre: nuevoCliente.nombre,
-        telefono: nuevoCliente.telefono,
-        direccion: nuevoCliente.direccion,
-        limite_credito: parseFloat(nuevoCliente.limite_credito) || 500
-      })
+      await crearCliente({ nombre: nuevoCliente.nombre, telefono: nuevoCliente.telefono, direccion: nuevoCliente.direccion, limite_credito: parseFloat(nuevoCliente.limite_credito) || 500 })
       alert('Cliente creado exitosamente!')
       setMostrarNuevoCliente(false)
       setNuevoCliente({ nombre: '', telefono: '', direccion: '', limite_credito: '500' })
-    } catch (err: any) {
-      alert('Error: ' + err.message)
-    }
+    } catch (err: any) { alert('Error: ' + err.message) }
   }
 
   const handleCrearCredito = async () => {
-    if (!nuevoCredito.total || parseFloat(nuevoCredito.total) <= 0) {
-      alert('El monto debe ser mayor a 0')
-      return
-    }
+    if (!nuevoCredito.total || parseFloat(nuevoCredito.total) <= 0) { alert('El monto debe ser mayor a 0'); return }
     if (!clienteSeleccionado) return
     try {
-      await crearCredito({
-        cliente_id: clienteSeleccionado.id,
-        total: parseFloat(nuevoCredito.total),
-        saldo_pendiente: parseFloat(nuevoCredito.total),
-        items: nuevoCredito.descripcion
-      })
+      await crearCredito({ cliente_id: clienteSeleccionado.id, total: parseFloat(nuevoCredito.total), saldo_pendiente: parseFloat(nuevoCredito.total), items: nuevoCredito.descripcion })
       alert('Credito creado exitosamente!')
       setMostrarNuevoCredito(false)
       setNuevoCredito({ total: '', descripcion: '' })
       setClienteSeleccionado(null)
       cargarCreditosList()
-    } catch (err: any) {
-      alert('Error: ' + err.message)
-    }
+    } catch (err: any) { alert('Error: ' + err.message) }
   }
 
   const handleAbono = async () => {
-    if (!nuevoAbono.monto || parseFloat(nuevoAbono.monto) <= 0) {
-      alert('El monto debe ser mayor a 0')
-      return
-    }
+    if (!nuevoAbono.monto || parseFloat(nuevoAbono.monto) <= 0) { alert('El monto debe ser mayor a 0'); return }
     if (!creditoSeleccionado) return
     try {
-      await registrarAbono({
-        credito_id: creditoSeleccionado.id,
-        cliente_id: creditoSeleccionado.cliente_id,
-        monto: parseFloat(nuevoAbono.monto),
-        metodo_pago: nuevoAbono.metodo_pago,
-        notas: nuevoAbono.notas
-      })
+      await registrarAbono({ credito_id: creditoSeleccionado.id, cliente_id: creditoSeleccionado.cliente_id, monto: parseFloat(nuevoAbono.monto), metodo_pago: nuevoAbono.metodo_pago, notas: nuevoAbono.notas })
       alert('Abono registrado!')
       setMostrarAbono(false)
       setNuevoAbono({ monto: '', metodo_pago: 'efectivo', notas: '' })
       setCreditoSeleccionado(null)
       cargarCreditosList()
-    } catch (err: any) {
-      alert('Error: ' + err.message)
-    }
+      if (clienteExpandido) verHistorialCliente(clienteExpandido)
+    } catch (err: any) { alert('Error: ' + err.message) }
   }
 
+  const clientesFiltrados = clientes.filter(c => 
+    c.nombre.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
+    (c.telefono && c.telefono.includes(busquedaCliente))
+  )
+
   const creditosActivos = creditos.filter(c => c.estado !== 'pagado')
+  const creditosPagados = creditos.filter(c => c.estado === 'pagado')
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 pb-4">
+    <div className="min-h-screen bg-gray-50 p-4 pb-20">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link to="/" className="p-2 hover:bg-gray-200 rounded-lg">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
+            <Link to="/" className="p-2 hover:bg-gray-200 rounded-lg"><ArrowLeft className="w-5 h-5" /></Link>
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Creditos</h1>
-              <p className="text-gray-500">Clientes y abonos</p>
+              <p className="text-gray-500">Clientes, abonos e historial</p>
             </div>
           </div>
           <button onClick={() => setMostrarNuevoCliente(true)} className="btn-primary">
-            <UserPlus className="w-4 h-4" />
-            Nuevo Cliente
+            <UserPlus className="w-4 h-4" /> Nuevo Cliente
           </button>
         </div>
 
-        {loading && <p className="text-center text-gray-500 mb-4">Cargando...</p>}
-
-        {/* Clientes */}
-        <h2 className="text-lg font-bold text-gray-700 mb-3">Clientes</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {clientes.map(c => (
-            <div key={c.id} className="card">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                <h3 className="font-bold">{c.nombre}</h3>
-              </div>
-              <div className="space-y-1 mb-3">
-                <p className="text-sm text-gray-500 flex items-center gap-1">
-                  <Phone className="w-3 h-3" /> {c.telefono || 'Sin telefono'}
-                </p>
-                <p className="text-sm text-gray-500 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> {c.direccion || 'Sin direccion'}
-                </p>
-              </div>
-              <div className="flex justify-between items-center mb-3 p-2 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-500">Limite: ${c.limite_credito}</span>
-                <span className={`text-xs font-bold ${c.saldo_actual > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  Saldo: ${c.saldo_actual || 0}
-                </span>
-              </div>
-              <button 
-                onClick={() => { setClienteSeleccionado(c); setMostrarNuevoCredito(true) }}
-                className="btn-warning w-full text-sm"
-              >
-                <CreditCard className="w-4 h-4" />
-                Nueva Venta a Credito
-              </button>
-            </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          {(['clientes', 'activos', 'pagados'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setTabActiva(tab)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-all ${
+                tabActiva === tab ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab === 'clientes' ? 'Clientes' : tab === 'activos' ? 'Creditos Activos' : 'Historial Pagado'}
+            </button>
           ))}
         </div>
 
-        {clientes.length === 0 && !loading && (
-          <div className="text-center py-8 text-gray-500 mb-8">
-            <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>No hay clientes registrados</p>
-            <p className="text-sm">Click en "Nuevo Cliente" para agregar</p>
+        {/* TAB CLIENTES */}
+        {tabActiva === 'clientes' && (
+          <>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o telefono..." className="input pl-10" />
+            </div>
+
+            {loading && <p className="text-center text-gray-500 mb-4">Cargando...</p>}
+
+            <div className="space-y-3">
+              {clientesFiltrados.map(c => (
+                <div key={c.id} className="card">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold">{c.nombre}</h3>
+                        <div className="flex gap-3 text-sm text-gray-500">
+                          <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {c.telefono || 'Sin tel'}</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {c.direccion || 'Sin dir'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right mr-4">
+                      <p className="text-xs text-gray-500">Limite: ${c.limite_credito}</p>
+                      <p className={`text-sm font-bold ${(c.saldo_actual || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>Saldo: ${c.saldo_actual || 0}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => verHistorialCliente(c.id)} className="btn-ghost text-xs py-2 px-3">
+                        <History className="w-4 h-4" /> Historial
+                      </button>
+                      <button onClick={() => { setClienteSeleccionado(c); setMostrarNuevoCredito(true) }} className="btn-warning text-xs py-2 px-3">
+                        <CreditCard className="w-4 h-4" /> Nuevo Credito
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Historial desplegable del cliente */}
+                  {clienteExpandido === c.id && (
+                    <div className="mt-4 border-t pt-4">
+                      <h4 className="font-bold text-sm text-gray-700 mb-3">Historial de {c.nombre}</h4>
+                      {creditosCliente.length === 0 ? (
+                        <p className="text-sm text-gray-500">No hay creditos registrados</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {creditosCliente.map(cred => (
+                            <div key={cred.id} className={`p-3 rounded-xl ${cred.estado === 'pagado' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="text-sm font-medium">Fecha: {new Date(cred.created_at).toLocaleDateString('es-MX')}</p>
+                                  <p className="text-xs text-gray-500">{cred.items || 'Sin descripcion'}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold">Total: ${(parseFloat(cred.total) || 0).toFixed(2)}</p>
+                                  {cred.estado !== 'pagado' && <p className="text-sm text-red-600 font-bold">Pendiente: ${(parseFloat(cred.saldo_pendiente) || 0).toFixed(2)}</p>}
+                                  <span className={`badge text-[10px] ${cred.estado === 'pagado' ? 'bg-green-100 text-green-700' : cred.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                    {cred.estado}
+                                  </span>
+                                </div>
+                              </div>
+                              {cred.estado !== 'pagado' && (
+                                <button onClick={() => { setCreditoSeleccionado(cred); setMostrarAbono(true) }} className="btn-success w-full mt-2 text-xs py-1">
+                                  <DollarSign className="w-3 h-3" /> Abonar
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {clientes.length === 0 && !loading && (
+              <div className="text-center py-8 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No hay clientes registrados</p>
+                <p className="text-sm">Click en "Nuevo Cliente" para agregar</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TAB CREDITOS ACTIVOS */}
+        {tabActiva === 'activos' && (
+          <div className="card overflow-hidden">
+            {creditosActivos.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No hay creditos activos</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Cliente</th>
+                      <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                      <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
+                      <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                      <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Accion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditosActivos.map(c => (
+                      <tr key={c.id} className="border-b hover:bg-gray-50">
+                        <td className="p-3 font-medium">{c.clientes?.nombre || 'Cliente'}</td>
+                        <td className="p-3 text-right">${(parseFloat(c.total) || 0).toFixed(2)}</td>
+                        <td className="p-3 text-right font-bold text-red-600">${(parseFloat(c.saldo_pendiente) || 0).toFixed(2)}</td>
+                        <td className="p-3 text-center">
+                          <span className={`badge ${c.estado === 'pendiente' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{c.estado}</span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button onClick={() => { setCreditoSeleccionado(c); setMostrarAbono(true) }} className="btn-success text-xs py-1 px-2">
+                            <DollarSign className="w-3 h-3" /> Abonar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Creditos Activos */}
-        <h2 className="text-lg font-bold text-gray-700 mb-3">Creditos Activos</h2>
-        <div className="card overflow-hidden">
-          {creditosActivos.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No hay creditos activos</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Cliente</th>
-                    <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
-                    <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Pendiente</th>
-                    <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
-                    <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Accion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creditosActivos.map(c => (
-                    <tr key={c.id} className="border-b hover:bg-gray-50">
-                      <td className="p-3 font-medium">{c.clientes?.nombre || 'Cliente'}</td>
-                      <td className="p-3 text-right">${(parseFloat(c.total) || 0).toFixed(2)}</td>
-                      <td className="p-3 text-right font-bold text-red-600">${(parseFloat(c.saldo_pendiente) || 0).toFixed(2)}</td>
-                      <td className="p-3 text-center">
-                        <span className={`badge ${
-                          c.estado === 'pendiente' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {c.estado}
-                        </span>
-                      </td>
-                      <td className="p-3 text-center">
-                        <button 
-                          onClick={() => { setCreditoSeleccionado(c); setMostrarAbono(true) }}
-                          className="btn-success text-xs py-1 px-2"
-                        >
-                          <DollarSign className="w-3 h-3" />
-                          Abonar
-                        </button>
-                      </td>
+        {/* TAB HISTORIAL PAGADO */}
+        {tabActiva === 'pagados' && (
+          <div className="card overflow-hidden">
+            {creditosPagados.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No hay creditos pagados aun</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Cliente</th>
+                      <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+                      <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {creditosPagados.map(c => (
+                      <tr key={c.id} className="border-b hover:bg-gray-50">
+                        <td className="p-3 font-medium">{c.clientes?.nombre || 'Cliente'}</td>
+                        <td className="p-3 text-right">${(parseFloat(c.total) || 0).toFixed(2)}</td>
+                        <td className="p-3 text-sm">{new Date(c.created_at).toLocaleDateString('es-MX')}</td>
+                        <td className="p-3 text-center"><span className="badge bg-green-100 text-green-700">Pagado</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Modal Nuevo Cliente */}
         {mostrarNuevoCliente && (
@@ -233,8 +305,7 @@ export default function Creditos() {
               <div className="flex gap-2 mt-6">
                 <button onClick={() => setMostrarNuevoCliente(false)} className="btn-outline flex-1">Cancelar</button>
                 <button onClick={handleCrearCliente} className="btn-primary flex-1">
-                  <Save className="w-4 h-4" />
-                  Guardar
+                  <Save className="w-4 h-4" /> Guardar
                 </button>
               </div>
             </div>
@@ -260,8 +331,7 @@ export default function Creditos() {
               <div className="flex gap-2 mt-6">
                 <button onClick={() => setMostrarNuevoCredito(false)} className="btn-outline flex-1">Cancelar</button>
                 <button onClick={handleCrearCredito} className="btn-warning flex-1">
-                  <CreditCard className="w-4 h-4" />
-                  Crear Credito
+                  <CreditCard className="w-4 h-4" /> Crear Credito
                 </button>
               </div>
             </div>
@@ -295,8 +365,7 @@ export default function Creditos() {
               <div className="flex gap-2 mt-6">
                 <button onClick={() => setMostrarAbono(false)} className="btn-outline flex-1">Cancelar</button>
                 <button onClick={handleAbono} className="btn-success flex-1">
-                  <DollarSign className="w-4 h-4" />
-                  Registrar Abono
+                  <DollarSign className="w-4 h-4" /> Registrar Abono
                 </button>
               </div>
             </div>
