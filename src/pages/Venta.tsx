@@ -37,8 +37,8 @@ export default function Venta() {
   const [clienteCredito, setClienteCredito] = useState<any>(null)
   const [mostrarSelectorCliente, setMostrarSelectorCliente] = useState(false)
 
-  const ticketRef = useRef<<HTMLDivElement>(null)
-  const busquedaRef = useRef<<HTMLInputElement>(null)
+  const ticketRef = useRef<HTMLDivElement>(null)
+  const busquedaRef = useRef<HTMLInputElement>(null)
 
   const total = totalCarrito()
 
